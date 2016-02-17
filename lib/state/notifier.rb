@@ -5,10 +5,23 @@ module State
     extend ActiveSupport::Concern
 
     def notify_targets(event)
-      name = self.class.name.underscore
+
+      klass = self.class
+
+      # support subclassing. search through parent chain for notification settings
+      while klass && ! klass.notification_targets
+        klass = klass.superclass
+      end
+
+      unless klass
+        Rails.logger.debug "couldn't find notifier settings for #{self.class.name}"
+        return
+      end
+
+      name = klass.name.underscore
       method = [name, event] * '_'
 
-      targets = self.class.notification_targets.map do |m|
+      targets = klass.notification_targets.map do |m|
         m.is_a?(Symbol) ? send(m) : m
       end.flatten
       Rails.logger.debug "StateNotifier: notifying #{method}, #{targets.size} targets"
